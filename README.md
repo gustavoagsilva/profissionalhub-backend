@@ -1,16 +1,16 @@
-# ProfissionalHub ? Backend
+# ProfissionalHub — Backend
 
-API de gest?o profissional. Reposit?rio em prepara??o: servidor, autentica??o e banco de dados ainda n?o implementados.
+API de gestão profissional. Repositório em preparação: servidor, autenticação e banco de dados ainda não implementados.
 
 ## Escopo previsto
 
-- Autentica??o e isolamento dos dados por profissional.
-- Alunos, locais, sess?es e reposi??es.
-- Cobran?as manuais e registro de quita??o integral.
+- Autenticação e isolamento dos dados por profissional.
+- Alunos, locais, sessões e reposições.
+- Cobranças manuais e registro de quitação integral.
 - Indicadores operacionais.
 
 ## Etapa do curso
 
-Desenvolvimento na branch `stage-back-end`, com pull request para `main`. Publica??o no GitHub e configura??o do servidor ainda pendentes.
+Desenvolvimento na branch `stage-back-end`, com pull request para `main`. Publicação no GitHub e configuração do servidor ainda pendentes.
 
 Nunca versionar `.env`, chaves de API, tokens ou logs.
