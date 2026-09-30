@@ -4,10 +4,11 @@ const { port, databaseUrl } = require('./config');
 const User = require('./models/user');
 const Location = require('./models/location');
 const Student = require('./models/student');
+const Session = require('./models/session');
 
 async function start() {
   await mongoose.connect(databaseUrl, { serverSelectionTimeoutMS: 5000 });
-  await Promise.all([User.init(), Location.init(), Student.init()]);
+  await Promise.all([User.init(), Location.init(), Student.init(), Session.init()]);
   await new Promise((resolve, reject) => {
     const server = app.listen(port, resolve);
     server.on('error', reject);

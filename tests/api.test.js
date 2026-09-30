@@ -10,6 +10,8 @@ const app = require('../app');
 const User = require('../models/user');
 const Location = require('../models/location');
 const Student = require('../models/student');
+const Session = require('../models/session');
+const sessionCases = require('./sessionCases');
 const { jwtSecret } = require('../config');
 const { requestLogger, errorLogger } = require('../middlewares/logger');
 
@@ -28,7 +30,7 @@ before(async () => {
   await mongoose.connect(`mongodb://127.0.0.1:27017/${databaseName}`, {
     serverSelectionTimeoutMS: 5000,
   });
-  await Promise.all([User.init(), Location.init(), Student.init()]);
+  await Promise.all([User.init(), Location.init(), Student.init(), Session.init()]);
 });
 
 after(async () => {
@@ -39,6 +41,8 @@ after(async () => {
   requestLogger.close();
   errorLogger.close();
 });
+
+test('agenda: horários, permissões, resultados, cancelamento e inativação', sessionCases);
 
 test('alunos: validação, edição, exclusividade e acesso por profissional', async () => {
   const first = await User.create({ ...account, email: 'students-first@example.com' });

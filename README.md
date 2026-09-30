@@ -6,7 +6,7 @@ API do ProfissionalHub, uma ferramenta de gestão para profissionais de Educaç�
 
 Implementados: cadastro, login, consulta de perfil, locais salvos e cadastro de alunos por profissional. Os dados são persistidos no MongoDB, as senhas são armazenadas com hash bcrypt e o login retorna um JWT com validade de sete dias.
 
-Ainda faltam atendimentos, cobranças e reposições, a integração com o frontend e a publicação com HTTPS. O frontend continua usando sua sessão demonstrativa até essa integração.
+Também foi implementada a agenda descrita abaixo. Ainda faltam cobranças e reposições, a integração com o frontend e a publicação com HTTPS. O frontend continua usando sua sessão demonstrativa até essa integração.
 
 ## Executar localmente
 
@@ -107,6 +107,47 @@ O telefone é exclusivo por profissional, inclusive para alunos inativos. Númer
 O proprietário vem do token; campos como `owner`, `name` na edição e campos desconhecidos são rejeitados. Consulta ou edição de aluno inexistente ou pertencente a outra conta retorna `404`. Não há rota de exclusão: o cadastro pode ser inativado para preservar seu histórico.
 
 Na futura integração, o formulário atual precisará exigir telefone, tornar email opcional, impedir edição do nome e aplicar a máscara com `+55`. Os campos `name`, `phone`, `email` e `goal` já correspondem aos usados no frontend. A API retorna `_id`; a interface demonstrativa utiliza `id`, que precisará ser adaptado. A cor do avatar permanece uma decisão de apresentação do frontend.
+
+## Agenda
+
+As rotas exigem autenticação e só permitem acesso aos atendimentos do próprio profissional.
+
+| Método | Rota | Ação |
+| --- | --- | --- |
+| GET | `/sessions` | Listar a agenda e o histórico em ordem de início. |
+| GET | `/sessions/:sessionId` | Consultar um atendimento. |
+| POST | `/sessions` | Agendar uma aula futura para um aluno ativo. |
+| PATCH | `/sessions/:sessionId` | Alterar os dados de uma aula agendada. |
+| PATCH | `/sessions/:sessionId/status` | Registrar resultado ou cancelamento. |
+
+Exemplo de corpo para agendamento (substitua o identificador e escolha uma data futura):
+
+```json
+{
+  "studentId": "IDENTIFICADOR_DO_ALUNO",
+  "date": "2026-10-20",
+  "time": "09:00",
+  "end": "10:00",
+  "location": "Residência do aluno"
+}
+```
+
+Para selecionar um local salvo, envie `locationId` no lugar de `location`. O local deve pertencer ao profissional. Nome e endereço são copiados para o atendimento para preservar seu histórico mesmo se o local for removido depois.
+
+- Datas: `YYYY-MM-DD`; horários: `HH:mm`, sempre interpretados como Brasília, UTC-03:00, independentemente do fuso do computador. `startsAt` e `endsAt` retornam instantes UTC para comparação.
+- Início e término devem ser no mesmo dia, com término depois do início. Não são aceitos cadastro retroativo, recorrência nem observações.
+- Exige intervalo mínimo de 45 minutos entre aulas, inclusive em dias consecutivos. Canceladas não ocupam horário. A API não calcula deslocamento para decidir disponibilidade.
+- A edição aceita aluno, data, início, término e local. O horário resultante deve ser futuro; aulas realizadas, faltas e canceladas não permitem editar esses dados.
+- A aula começa como `scheduled`. Para registrar o check, envie `{ "status": "completed" }`; para falta, `{ "status": "missed" }`. Ambos só são aceitos após o término. É possível corrigir de realizado para falta e vice-versa. Não há mudança automática de situação.
+- Para cancelar uma aula agendada, envie `{ "status": "cancelled", "cancelledBy": "professional" }` ou use `"student"` quando o cancelamento tiver sido solicitado pelo aluno. A ação sempre é feita pelo profissional autenticado. Não há motivo textual obrigatório, exclusão nem reativação de canceladas.
+- Aluno com aulas futuras agendadas não pode ser inativado. O profissional deve cancelá-las manualmente primeiro. Aulas passadas pendentes de resultado permanecem no histórico e podem ter o resultado registrado mesmo após a inativação.
+- Pagamentos não são consultados nem gerados por essas rotas. Reposições não são geradas; suas regras ainda serão definidas.
+
+Conflitos de intervalo, situação ou inativação retornam `409`; dados inválidos e horários retroativos retornam `400`. Recursos inexistentes ou de outro profissional retornam `404`.
+
+As gravações de agenda e as alterações de alunos são processadas em sequência por profissional, evitando conflito entre requisições simultâneas **em uma única instância Node.js**. A publicação deve usar uma instância; antes de usar cluster ou múltiplas réplicas, essa coordenação precisa ser transferida para o banco. Outros profissionais não aguardam a mesma fila.
+
+Os testes verificam limites de intervalo, passagem de dia, isolamento entre contas, cancelamentos, correções de resultado, inativação e agendamento simultâneo. Na integração futura do frontend serão conectados o check, os formulários e as mensagens a essas rotas.
 
 ## Organização
 

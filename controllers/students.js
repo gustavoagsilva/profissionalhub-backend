@@ -1,4 +1,5 @@
 const Student = require('../models/student');
+const Session = require('../models/session');
 const ApiError = require('../errors/ApiError');
 const { NOT_FOUND } = require('../utils/messages');
 
@@ -50,6 +51,14 @@ const updateStudent = async (req, res, next) => {
     ['phone', 'email', 'goal', 'active'].forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+    if (updates.active === false && await Session.exists({
+      owner: req.user._id,
+      studentId: req.params.studentId,
+      status: 'scheduled',
+      startsAt: { $gt: new Date() },
+    })) {
+      throw new ApiError(409, 'Este aluno possui aulas futuras agendadas. Cancele essas aulas antes de inativá-lo.');
+    }
     const student = await Student.findOneAndUpdate(
       { _id: req.params.studentId, owner: req.user._id },
       { $set: updates },

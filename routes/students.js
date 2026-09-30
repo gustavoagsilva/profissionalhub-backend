@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const scheduleQueue = require('../middlewares/scheduleQueue');
 const {
   createStudent, getStudents, getStudent, updateStudent,
 } = require('../controllers/students');
@@ -9,6 +10,6 @@ const {
 router.get('/', getStudents);
 router.post('/', validateStudentCreation, createStudent);
 router.get('/:studentId', validateStudentId, getStudent);
-router.patch('/:studentId', validateStudentId, validateStudentUpdate, updateStudent);
+router.patch('/:studentId', validateStudentId, validateStudentUpdate, scheduleQueue(updateStudent));
 
 module.exports = router;
