@@ -12,6 +12,7 @@ const Location = require('../models/location');
 const Student = require('../models/student');
 const Session = require('../models/session');
 const sessionCases = require('./sessionCases');
+const startupError = require('../utils/startupError');
 const { jwtSecret } = require('../config');
 const { requestLogger, errorLogger } = require('../middlewares/logger');
 
@@ -40,6 +41,19 @@ after(async () => {
   await mongoose.disconnect();
   requestLogger.close();
   errorLogger.close();
+});
+
+test('diagnóstico de inicialização não expõe credenciais', () => {
+  const secret = 'mongodb+srv://user:secret@example.com/database';
+  assert.match(startupError({ code: 18, message: secret }), /^AUTH:/);
+  assert.match(startupError({ code: 13, message: secret }), /^PERMISSION:/);
+  assert.match(startupError({ name: 'MongoParseError', message: secret }), /^URI:/);
+  assert.match(startupError({
+    name: 'MongooseServerSelectionError',
+    reason: { servers: new Map([['server', { error: { code: 18, message: secret } }]]) },
+  }), /^AUTH:/);
+  assert.match(startupError({ name: 'MongooseServerSelectionError' }), /^CONNECTION:/);
+  assert.equal(startupError({ message: secret }).includes(secret), false);
 });
 
 test('agenda: horários, permissões, resultados, cancelamento e inativação', sessionCases);
