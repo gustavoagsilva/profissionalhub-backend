@@ -1,16 +1,183 @@
-# ProfissionalHub ? Backend
+﻿# ProfissionalHub — Backend
 
-API de gest?o profissional. Reposit?rio em prepara??o: servidor, autentica??o e banco de dados ainda n?o implementados.
+API do ProfissionalHub, uma ferramenta de gestão para profissionais de Educação Física autônomos.
 
-## Escopo previsto
+## Estado atual
 
-- Autentica??o e isolamento dos dados por profissional.
-- Alunos, locais, sess?es e reposi??es.
-- Cobran?as manuais e registro de quita??o integral.
-- Indicadores operacionais.
+Implementados: cadastro, login, consulta de perfil, locais salvos e cadastro de alunos por profissional. Os dados são persistidos no MongoDB, as senhas são armazenadas com hash bcrypt e o login retorna um JWT com validade de sete dias.
 
-## Etapa do curso
+Também foi implementada a agenda descrita abaixo. A API está publicada com HTTPS no Render e usa MongoDB Atlas. Ainda faltam cobranças, reposições e a integração com o frontend. O frontend continua usando sua sessão demonstrativa até essa integração.
 
-Desenvolvimento na branch `stage-back-end`, com pull request para `main`. Publica??o no GitHub e configura??o do servidor ainda pendentes.
+## API publicada
 
-Nunca versionar `.env`, chaves de API, tokens ou logs.
+Endereço: [https://profissionalhub-backend.onrender.com](https://profissionalhub-backend.onrender.com).
+
+As rotas são relativas a esse endereço, por exemplo `POST /signup` e `GET /users/me`. Acessar uma rota protegida sem token retorna `401`; isso não indica falha de publicação. O plano gratuito pode demorar a responder após períodos de inatividade.
+
+Em 01/10/2026, foram realizadas 30 verificações HTTP na API publicada: cadastro, email duplicado, login, senha incorreta, perfil, token inválido, validações, criação/listagem/exclusão de locais, isolamento entre contas, cadastro de alunos, telefone duplicado, nome não editável, agendamento, intervalo de 45 minutos, bloqueio de conclusão antecipada, cancelamento e inativação. Todas passaram. Os locais de teste foram excluídos; duas contas de teste, um aluno inativo e uma aula cancelada permaneceram, pois não existem rotas de exclusão desses registros.
+
+Os testes publicados verificam o comportamento HTTP. A correção de resultados de aulas passadas e os demais cenários detalhados são cobertos pelos testes locais, sem manipular datas diretamente no banco de produção. Os arquivos de log do plano gratuito do Render não têm persistência garantida entre reinicializações e deploys.
+
+## Executar localmente
+
+É necessário ter Node.js 20.19 ou superior e MongoDB em execução.
+
+Na pasta deste repositório:
+
+```bash
+npm ci
+npm run dev
+```
+
+A API atende em `http://localhost:3000`. `npm run dev` reinicia o servidor quando os arquivos mudam; `npm start` inicia sem esse monitoramento.
+
+Em desenvolvimento, é possível iniciar sem `.env`: o banco padrão é `mongodb://127.0.0.1:27017/profissionalhub`. Para personalizar, copie `.env.example` para `.env`:
+
+| Variável | Uso |
+| --- | --- |
+| `PORT` | Porta do servidor; padrão `3000`. |
+| `MONGODB_URI` | Endereço do banco de dados. |
+| `JWT_SECRET` | Segredo usado para assinar e verificar tokens. |
+| `ALLOWED_ORIGINS` | Endereços do frontend separados por vírgula. Inclua a porta usada pelo Vite. |
+| `NODE_ENV` | `development` localmente ou `production` na publicação. |
+
+Em produção, `MONGODB_URI`, `ALLOWED_ORIGINS` e um `JWT_SECRET` de pelo menos 32 caracteres são obrigatórios. A chave padrão de desenvolvimento não deve ser usada na publicação. Este bloco não precisa da chave Geoapify: ele armazena os locais selecionados pelo usuário.
+
+## Rotas
+
+As rotas recebem e retornam JSON. Nas rotas protegidas, envie `Authorization: Bearer SEU_TOKEN`.
+
+| Método | Rota | Autenticação | Função |
+| --- | --- | --- | --- |
+| POST | `/signup` | Pública | Criar conta com `name`, `email` e `password`. |
+| POST | `/signin` | Pública | Receber `{ "token": "..." }` com `email` e `password`. |
+| GET | `/users/me` | JWT | Consultar o perfil autenticado. |
+| GET | `/locations` | JWT | Listar os locais da conta autenticada. |
+| POST | `/locations` | JWT | Salvar um local. |
+| DELETE | `/locations/:locationId` | JWT | Excluir um local pertencente à conta autenticada. |
+
+Exemplo de cadastro:
+
+```json
+{
+  "name": "Ana Silva",
+  "email": "ana@example.com",
+  "password": "uma-senha-de-exemplo"
+}
+```
+
+O nome deve ter de 2 a 30 caracteres. A senha deve ter no mínimo 8 caracteres e no máximo 72 bytes. O email deve ser válido e exclusivo. Senhas e hashes não são enviados nas respostas.
+
+Exemplo de local:
+
+```json
+{
+  "name": "Parque de exemplo",
+  "address": "Rua de exemplo, 10 — São Paulo",
+  "category": "leisure.park",
+  "placeId": "identificador-retornado-pela-geoapify",
+  "coordinates": [-46.63, -23.55]
+}
+```
+
+`name`, `address` e `category` são obrigatórios. `placeId` e `coordinates` são opcionais. As coordenadas seguem a ordem longitude, latitude. O proprietário é definido pelo token; não envie `owner` no corpo. Um mesmo `placeId` só pode ser salvo uma vez por conta.
+
+Erros retornam `{ "message": "..." }`, com códigos `400` (dados inválidos), `401` (não autenticado), `403` (local de outra conta), `404` (não encontrado), `409` (duplicidade) e `500` (erro interno). Cadastro e login têm limite de requisições por IP e podem retornar `429`.
+
+## Alunos
+
+Todas as rotas de alunos exigem JWT e só acessam os dados do profissional autenticado.
+
+| Método | Rota | Função |
+| --- | --- | --- |
+| POST | `/students` | Cadastrar aluno, inicialmente ativo. |
+| GET | `/students` | Listar os próprios alunos, inclusive inativos. |
+| GET | `/students/:studentId` | Consultar um aluno próprio. |
+| PATCH | `/students/:studentId` | Editar telefone, email, objetivo ou situação. |
+
+Exemplo de cadastro:
+
+```json
+{
+  "name": "Maria Silva",
+  "phone": "+55 (11) 99999-9999",
+  "email": "maria@example.com",
+  "goal": "Melhorar o condicionamento físico"
+}
+```
+
+- `name`: obrigatório, de 2 a 60 caracteres. Não pode ser enviado na edição.
+- `phone`: obrigatório, celular brasileiro com DDD válido e nove dígitos começando em 9. Aceita DDD e número com ou sem prefixo 55 e formatação; armazena e retorna `+5511999999999`. A máscara `+55 (11) 99999-9999` será aplicada na futura integração do formulário. A validação de formato não verifica se existe uma conta WhatsApp ativa.
+- `email`: opcional, validado quando preenchido; pode ser apagado enviando `""`.
+- `goal`: texto livre opcional, até 120 caracteres; pode ser apagado enviando `""`.
+- `active`: definido automaticamente como `true` no cadastro. Para inativar, envie `PATCH` com `{ "active": false }`; para reativar, `{ "active": true }`.
+
+O telefone é exclusivo por profissional, inclusive para alunos inativos. Números equivalentes com formatações diferentes são considerados iguais. Duplicidade retorna `409` com a mensagem `Já existe um aluno cadastrado com este telefone`. A verificação também se aplica à edição, mas manter o próprio telefone é permitido. Ao trocar o número, o antigo fica disponível para outro cadastro.
+
+O proprietário vem do token; campos como `owner`, `name` na edição e campos desconhecidos são rejeitados. Consulta ou edição de aluno inexistente ou pertencente a outra conta retorna `404`. Não há rota de exclusão: o cadastro pode ser inativado para preservar seu histórico.
+
+Na futura integração, o formulário atual precisará exigir telefone, tornar email opcional, impedir edição do nome e aplicar a máscara com `+55`. Os campos `name`, `phone`, `email` e `goal` já correspondem aos usados no frontend. A API retorna `_id`; a interface demonstrativa utiliza `id`, que precisará ser adaptado. A cor do avatar permanece uma decisão de apresentação do frontend.
+
+## Agenda
+
+As rotas exigem autenticação e só permitem acesso aos atendimentos do próprio profissional.
+
+| Método | Rota | Ação |
+| --- | --- | --- |
+| GET | `/sessions` | Listar a agenda e o histórico em ordem de início. |
+| GET | `/sessions/:sessionId` | Consultar um atendimento. |
+| POST | `/sessions` | Agendar uma aula futura para um aluno ativo. |
+| PATCH | `/sessions/:sessionId` | Alterar os dados de uma aula agendada. |
+| PATCH | `/sessions/:sessionId/status` | Registrar resultado ou cancelamento. |
+
+Exemplo de corpo para agendamento (substitua o identificador e escolha uma data futura):
+
+```json
+{
+  "studentId": "IDENTIFICADOR_DO_ALUNO",
+  "date": "2026-10-20",
+  "time": "09:00",
+  "end": "10:00",
+  "location": "Residência do aluno"
+}
+```
+
+Para selecionar um local salvo, envie `locationId` no lugar de `location`. O local deve pertencer ao profissional. Nome e endereço são copiados para o atendimento para preservar seu histórico mesmo se o local for removido depois.
+
+- Datas: `YYYY-MM-DD`; horários: `HH:mm`, sempre interpretados como Brasília, UTC-03:00, independentemente do fuso do computador. `startsAt` e `endsAt` retornam instantes UTC para comparação.
+- Início e término devem ser no mesmo dia, com término depois do início. Não são aceitos cadastro retroativo, recorrência nem observações.
+- Exige intervalo mínimo de 45 minutos entre aulas, inclusive em dias consecutivos. Canceladas não ocupam horário. A API não calcula deslocamento para decidir disponibilidade.
+- A edição aceita aluno, data, início, término e local. O horário resultante deve ser futuro; aulas realizadas, faltas e canceladas não permitem editar esses dados.
+- A aula começa como `scheduled`. Para registrar o check, envie `{ "status": "completed" }`; para falta, `{ "status": "missed" }`. Ambos só são aceitos após o término. É possível corrigir de realizado para falta e vice-versa. Não há mudança automática de situação.
+- Para cancelar uma aula agendada, envie `{ "status": "cancelled", "cancelledBy": "professional" }` ou use `"student"` quando o cancelamento tiver sido solicitado pelo aluno. A ação sempre é feita pelo profissional autenticado. Não há motivo textual obrigatório, exclusão nem reativação de canceladas.
+- Aluno com aulas futuras agendadas não pode ser inativado. O profissional deve cancelá-las manualmente primeiro. Aulas passadas pendentes de resultado permanecem no histórico e podem ter o resultado registrado mesmo após a inativação.
+- Pagamentos não são consultados nem gerados por essas rotas. Reposições não são geradas; suas regras ainda serão definidas.
+
+Conflitos de intervalo, situação ou inativação retornam `409`; dados inválidos e horários retroativos retornam `400`. Recursos inexistentes ou de outro profissional retornam `404`.
+
+As gravações de agenda e as alterações de alunos são processadas em sequência por profissional, evitando conflito entre requisições simultâneas **em uma única instância Node.js**. A publicação deve usar uma instância; antes de usar cluster ou múltiplas réplicas, essa coordenação precisa ser transferida para o banco. Outros profissionais não aguardam a mesma fila.
+
+Os testes verificam limites de intervalo, passagem de dia, isolamento entre contas, cancelamentos, correções de resultado, inativação e agendamento simultâneo. Na integração futura do frontend serão conectados o check, os formulários e as mensagens a essas rotas.
+
+## Organização
+
+- `server.js`: conecta ao MongoDB e inicia o servidor.
+- `app.js`: configura os middlewares e as rotas do Express.
+- `routes/`: associa URLs aos controladores.
+- `controllers/`: implementa as ações de usuários e locais.
+- `models/`: define os documentos e validações do MongoDB.
+- `middlewares/`: autenticação, validação, logs, limite de requisições e tratamento de erros.
+- `config/`, `errors/` e `utils/`: configuração, classe de erro e mensagens compartilhadas.
+
+## Verificação
+
+```bash
+npm run lint
+npm test
+```
+
+O lint segue Airbnb Base. Os testes de integração exigem MongoDB local na porta `27017`. Criam e removem um banco temporário `profissionalhub_test_*`, separado do banco do aplicativo, verificando cadastro, login, validações, persistência, respostas de erro e isolamento entre duas contas.
+
+Requisições e erros são registrados em JSON em `logs/request.log` e `logs/error.log`. Corpos, cabeçalhos e query strings não são registrados para evitar gravar credenciais. `.env`, logs e `node_modules` são ignorados pelo Git; `.env.example` contém somente configuração de exemplo.
+
+Desenvolvimento na branch `stage-back-end`, com futura pull request para `main`.
