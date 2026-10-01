@@ -6,7 +6,17 @@ API do ProfissionalHub, uma ferramenta de gestão para profissionais de Educaç�
 
 Implementados: cadastro, login, consulta de perfil, locais salvos e cadastro de alunos por profissional. Os dados são persistidos no MongoDB, as senhas são armazenadas com hash bcrypt e o login retorna um JWT com validade de sete dias.
 
-Também foi implementada a agenda descrita abaixo. Ainda faltam cobranças e reposições, a integração com o frontend e a publicação com HTTPS. O frontend continua usando sua sessão demonstrativa até essa integração.
+Também foi implementada a agenda descrita abaixo. A API está publicada com HTTPS no Render e usa MongoDB Atlas. Ainda faltam cobranças, reposições e a integração com o frontend. O frontend continua usando sua sessão demonstrativa até essa integração.
+
+## API publicada
+
+Endereço: [https://profissionalhub-backend.onrender.com](https://profissionalhub-backend.onrender.com).
+
+As rotas são relativas a esse endereço, por exemplo `POST /signup` e `GET /users/me`. Acessar uma rota protegida sem token retorna `401`; isso não indica falha de publicação. O plano gratuito pode demorar a responder após períodos de inatividade.
+
+Em 01/10/2026, foram realizadas 30 verificações HTTP na API publicada: cadastro, email duplicado, login, senha incorreta, perfil, token inválido, validações, criação/listagem/exclusão de locais, isolamento entre contas, cadastro de alunos, telefone duplicado, nome não editável, agendamento, intervalo de 45 minutos, bloqueio de conclusão antecipada, cancelamento e inativação. Todas passaram. Os locais de teste foram excluídos; duas contas de teste, um aluno inativo e uma aula cancelada permaneceram, pois não existem rotas de exclusão desses registros.
+
+Os testes publicados verificam o comportamento HTTP. A correção de resultados de aulas passadas e os demais cenários detalhados são cobertos pelos testes locais, sem manipular datas diretamente no banco de produção. Os arquivos de log do plano gratuito do Render não têm persistência garantida entre reinicializações e deploys.
 
 ## Executar localmente
 
